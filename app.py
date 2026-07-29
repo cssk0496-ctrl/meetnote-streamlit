@@ -141,6 +141,17 @@ st.markdown(
     }
     .security strong { color:#dbe7ff; }
     .security p { margin:8px 0 0; color:#7d8ba2; font-size:12px; }
+    .api-warning {
+        margin: 0 0 14px;
+        padding: 13px 15px;
+        border: 1px solid rgba(121,155,226,.32);
+        border-radius: 12px;
+        color: #dbe7ff !important;
+        background: rgba(53,72,112,.46);
+        font-size: 12px;
+        line-height: 1.6;
+    }
+    .api-warning strong { color:#ffffff !important; }
     @media (max-width: 640px) {
         .block-container { padding-left:1rem; padding-right:1rem; }
         .hero { padding-top:48px; }
@@ -461,7 +472,15 @@ with right:
     )
 
     if not get_api_key():
-        st.info("배포 후 Streamlit Secrets에 OPENAI_API_KEY를 등록하면 AI 분석이 활성화됩니다.")
+        st.markdown(
+            """
+            <div class="api-warning">
+              🔑 <strong>API 키 설정이 필요합니다.</strong><br>
+              Streamlit Secrets에 OPENAI_API_KEY를 등록하면 실제 음성 분석이 활성화됩니다.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     analyze = st.button(
         "✦ AI 회의록 만들기",
@@ -471,6 +490,7 @@ with right:
     )
     sample = st.button(
         "🧪 샘플 회의록 보기",
+        type="primary",
         use_container_width=True,
         help="음성 파일이나 API 사용 없이 결과 화면과 다운로드 기능을 확인합니다.",
     )
