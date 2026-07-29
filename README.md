@@ -1,6 +1,6 @@
 # MeetNote — AI 회의록 자동화
 
-음성 회의 파일을 업로드하면 OpenAI 음성인식 API로 녹취하고, 핵심 요약·결정사항·담당 업무를 자동 작성하는 Streamlit 앱입니다.
+음성 회의 파일을 업로드하면 Gemini API로 녹취하고, 핵심 요약·결정사항·담당 업무를 자동 작성하는 Streamlit 앱입니다.
 
 ## 로컬 실행
 
@@ -12,7 +12,7 @@ streamlit run app.py
 로컬에서는 `.streamlit/secrets.toml` 파일을 만들고 다음 내용을 입력합니다.
 
 ```toml
-OPENAI_API_KEY = "발급받은_API_키"
+GEMINI_API_KEY = "Google_AI_Studio에서_발급받은_API_키"
 ```
 
 API 키가 포함된 `secrets.toml` 파일은 GitHub에 올리지 마세요.
@@ -25,7 +25,7 @@ API 키가 포함된 `secrets.toml` 파일은 GitHub에 올리지 마세요.
 4. **Advanced settings → Secrets**에 아래 내용을 등록합니다.
 
 ```toml
-OPENAI_API_KEY = "발급받은_API_키"
+GEMINI_API_KEY = "Google_AI_Studio에서_발급받은_API_키"
 ```
 
 5. **Deploy**를 누릅니다.

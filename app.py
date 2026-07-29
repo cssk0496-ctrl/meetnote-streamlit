@@ -3,11 +3,11 @@ import csv
 import html
 from io import BytesIO, StringIO
 from datetime import datetime
-from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
-from openai import OpenAI
+from google import genai
+from google.genai import types
 from docx import Document
 from docx.shared import Pt
 from reportlab.lib.pagesizes import A4
@@ -219,57 +219,59 @@ SAMPLE_TRANSCRIPT = """[00:00] 김창숙: 오늘은 AI 회의록 자동화 서�
 
 def get_api_key() -> str | None:
     try:
-        return st.secrets["OPENAI_API_KEY"]
+        return st.secrets["GEMINI_API_KEY"]
     except (KeyError, FileNotFoundError):
         return None
 
 
 def analyze_meeting(uploaded_file, language: str) -> tuple[str, dict]:
-    client = OpenAI(api_key=get_api_key())
-    # multipart 업로드 헤더는 한글 파일명에서 ASCII 인코딩 오류가 날 수 있으므로,
-    # 확장자만 유지한 안전한 영문 파일명을 API에 전달합니다.
-    extension = Path(uploaded_file.name).suffix.lower()
-    if extension not in {
-        ".mp3",
-        ".wav",
-        ".m4a",
-        ".mp4",
-        ".mpeg",
-        ".mpga",
-        ".ogg",
-        ".webm",
-    }:
-        extension = ".mp3"
-    safe_filename = f"meeting_audio{extension}"
+    client = genai.Client(api_key=get_api_key())
+    mime_type = uploaded_file.type or "audio/mpeg"
+    prompt = f"""
+당신은 한국 기업의 전문 회의록 작성자입니다.
+첨부한 {language} 업무 회의 음성을 처음부터 끝까지 분석하세요.
 
-    transcription = client.audio.transcriptions.create(
-        model="gpt-transcribe",
-        file=(safe_filename, uploaded_file.getvalue(), uploaded_file.type),
-        prompt=(
-            f"이 파일은 {language} 업무 회의입니다. "
-            "회사명, 프로젝트명, 사람 이름과 기술 용어를 가능한 정확히 기록하세요."
+다음 원칙을 반드시 지키세요.
+- 음성 내용을 가능한 정확히 녹취하고, 회사명·프로젝트명·사람 이름·기술 용어를 보존합니다.
+- 녹취에 없는 내용을 추측하지 않습니다.
+- 결정된 내용과 단순 의견을 구분합니다.
+- 불명확한 담당자나 기한은 "미정"으로 표시합니다.
+- 실행 업무는 짧고 구체적으로 작성합니다.
+- 모든 결과는 한국어로 작성합니다.
+
+반드시 다음 키만 포함하는 JSON 객체로 응답하세요.
+{{
+  "transcript": "전체 음성 녹취",
+  "title": "회의 내용을 반영한 짧은 제목",
+  "summary": "핵심 내용을 정리한 문단",
+  "decisions": ["결정사항"],
+  "actions": [
+    {{"task": "담당 업무", "owner": "담당자", "due": "기한"}}
+  ],
+  "keywords": ["주요 키워드"]
+}}
+"""
+    response = client.models.generate_content(
+        model="gemini-2.5-flash",
+        contents=[
+            types.Part.from_bytes(
+                data=uploaded_file.getvalue(),
+                mime_type=mime_type,
+            ),
+            prompt,
+        ],
+        config=types.GenerateContentConfig(
+            response_mime_type="application/json",
+            temperature=0.2,
         ),
     )
-    transcript = transcription.text
-
-    response = client.responses.create(
-        model="gpt-5-mini",
-        instructions=(
-            "당신은 한국 기업의 전문 회의록 작성자입니다. "
-            "녹취에 없는 내용을 추측하지 말고, 불명확한 담당자나 기한은 '미정'으로 표시하세요. "
-            "결정된 내용과 단순 의견을 구분하고, 실행 업무는 짧고 명확하게 작성하세요."
-        ),
-        input=f"다음 회의 녹취를 한국어 회의록으로 정리하세요.\n\n{transcript}",
-        text={
-            "format": {
-                "type": "json_schema",
-                "name": "meeting_minutes",
-                "strict": True,
-                "schema": SUMMARY_SCHEMA,
-            }
-        },
-    )
-    return transcript, json.loads(response.output_text)
+    if not response.text:
+        raise ValueError("Gemini에서 분석 결과를 반환하지 않았습니다.")
+    result = json.loads(response.text)
+    transcript = result.pop("transcript", "")
+    if not transcript:
+        raise ValueError("음성 녹취 결과가 비어 있습니다.")
+    return transcript, result
 
 
 def make_minutes_text(result: dict, transcript: str, filename: str) -> str:
@@ -491,7 +493,7 @@ with right:
             """
             <div class="api-warning">
               🔑 <strong>API 키 설정이 필요합니다.</strong><br>
-              Streamlit Secrets에 OPENAI_API_KEY를 등록하면 실제 음성 분석이 활성화됩니다.
+              Streamlit Secrets에 GEMINI_API_KEY를 등록하면 실제 음성 분석이 활성화됩니다.
             </div>
             """,
             unsafe_allow_html=True,
