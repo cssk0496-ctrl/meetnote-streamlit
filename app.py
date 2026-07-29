@@ -3,6 +3,7 @@ import csv
 import html
 from io import BytesIO, StringIO
 from datetime import datetime
+from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -225,10 +226,25 @@ def get_api_key() -> str | None:
 
 def analyze_meeting(uploaded_file, language: str) -> tuple[str, dict]:
     client = OpenAI(api_key=get_api_key())
+    # multipart 업로드 헤더는 한글 파일명에서 ASCII 인코딩 오류가 날 수 있으므로,
+    # 확장자만 유지한 안전한 영문 파일명을 API에 전달합니다.
+    extension = Path(uploaded_file.name).suffix.lower()
+    if extension not in {
+        ".mp3",
+        ".wav",
+        ".m4a",
+        ".mp4",
+        ".mpeg",
+        ".mpga",
+        ".ogg",
+        ".webm",
+    }:
+        extension = ".mp3"
+    safe_filename = f"meeting_audio{extension}"
 
     transcription = client.audio.transcriptions.create(
         model="gpt-transcribe",
-        file=(uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type),
+        file=(safe_filename, uploaded_file.getvalue(), uploaded_file.type),
         prompt=(
             f"이 파일은 {language} 업무 회의입니다. "
             "회사명, 프로젝트명, 사람 이름과 기술 용어를 가능한 정확히 기록하세요."
