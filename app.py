@@ -144,6 +144,31 @@ SUMMARY_SCHEMA = {
     "additionalProperties": False,
 }
 
+SAMPLE_RESULT = {
+    "title": "주간 프로젝트 진행회의",
+    "summary": (
+        "AI 회의록 자동화 서비스의 주요 기능과 적용 일정을 검토했습니다. "
+        "음성 파일에서 핵심 내용과 실행 업무를 자동 추출하고, 결과를 Word·PDF·텍스트로 "
+        "내보낼 수 있도록 구성하기로 했습니다. 다음 회의 전까지 테스트 결과를 취합합니다."
+    ),
+    "decisions": [
+        "회의록 결과에 핵심 요약, 결정사항, 담당 업무를 구분하여 표시합니다.",
+        "Word, PDF, 텍스트 및 담당 업무 CSV 다운로드 기능을 적용합니다.",
+        "짧은 음성 파일로 1차 기능 검증을 진행합니다.",
+    ],
+    "actions": [
+        {"task": "테스트 음성 파일 준비", "owner": "김창숙", "due": "8월 3일"},
+        {"task": "회의록 다운로드 결과 확인", "owner": "기획팀", "due": "8월 4일"},
+        {"task": "개선 의견 취합", "owner": "참석자 전체", "due": "다음 회의 전"},
+    ],
+    "keywords": ["AI 회의록", "음성인식", "업무 자동화", "결과 내보내기"],
+}
+
+SAMPLE_TRANSCRIPT = """[00:00] 김창숙: 오늘은 AI 회의록 자동화 서비스의 주요 기능을 검토하겠습니다.
+[00:12] 참석자 1: 요약뿐 아니라 결정사항과 담당 업무도 구분되면 좋겠습니다.
+[00:25] 김창숙: Word, PDF, 텍스트 파일과 담당 업무 CSV를 내려받을 수 있게 적용하겠습니다.
+[00:41] 참석자 2: 다음 회의 전까지 짧은 음성 파일로 기능을 검증하겠습니다."""
+
 
 def get_api_key() -> str | None:
     try:
@@ -409,8 +434,19 @@ with right:
         use_container_width=True,
         disabled=uploaded_file is None or not get_api_key(),
     )
+    sample = st.button(
+        "🧪 샘플 회의록 보기",
+        use_container_width=True,
+        help="음성 파일이나 API 사용 없이 결과 화면과 다운로드 기능을 확인합니다.",
+    )
     st.caption("🔒 업로드한 파일은 앱에 영구 저장하지 않습니다.")
     st.markdown("</div>", unsafe_allow_html=True)
+
+if sample:
+    st.session_state["meeting_result"] = SAMPLE_RESULT
+    st.session_state["meeting_transcript"] = SAMPLE_TRANSCRIPT
+    st.session_state["meeting_filename"] = "샘플_회의음성.m4a"
+    st.session_state["is_sample"] = True
 
 if analyze and uploaded_file:
     progress = st.progress(8, text="회의 음성을 준비하고 있습니다...")
@@ -421,6 +457,7 @@ if analyze and uploaded_file:
         st.session_state["meeting_result"] = result
         st.session_state["meeting_transcript"] = transcript
         st.session_state["meeting_filename"] = uploaded_file.name
+        st.session_state["is_sample"] = False
         progress.progress(100, text="회의록이 완성되었습니다.")
     except Exception as error:
         st.error(f"분석 중 오류가 발생했습니다: {error}")
@@ -439,7 +476,7 @@ if "meeting_result" in st.session_state:
     st.markdown(
         f"""
         <div class="result-title">
-          <div class="done-label">✓ 분석 완료</div>
+          <div class="done-label">✓ {"샘플 결과" if st.session_state.get("is_sample") else "분석 완료"}</div>
           <h2>{result['title']}</h2>
         </div>
         """,
