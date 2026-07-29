@@ -35,8 +35,12 @@ st.markdown(
     }
     [data-testid="stHeader"] { background: transparent; }
     [data-testid="stSidebar"] { background: #0c1220; }
-    [data-testid="stAlert"] { color: #dbe7ff; }
-    [data-testid="stAlert"] p { color: #dbe7ff !important; }
+    [data-testid="stAlert"] {
+        color: #dbe7ff !important;
+        background: rgba(53, 72, 112, .45) !important;
+        border: 1px solid rgba(121, 155, 226, .28) !important;
+    }
+    [data-testid="stAlert"] * { color: #dbe7ff !important; }
     .block-container { max-width: 1160px; padding-top: 1.6rem; padding-bottom: 5rem; }
     .brand {
         display: flex; align-items: center; gap: 11px; padding: 4px 0 22px;
@@ -70,18 +74,49 @@ st.markdown(
         min-height:170px; border:1px dashed rgba(139,92,246,.55);
         border-radius:18px; background:rgba(74,71,150,.08);
     }
-    [data-testid="stFileUploaderDropzoneInstructions"] > div > span {
-        color:#e3e6ee; font-weight:700;
+    [data-testid="stFileUploader"] label,
+    [data-testid="stFileUploader"] label p {
+        color:#9ca8bd !important;
     }
-    .stButton > button, .stDownloadButton > button {
+    [data-testid="stFileUploaderDropzoneInstructions"] *,
+    [data-testid="stFileUploaderDropzone"] small {
+        color:#e3e6ee !important; font-weight:700;
+    }
+    [data-testid="stFileUploaderDropzone"] button {
+        color:#fff !important;
+        background:#4c5fc2 !important;
+        border:1px solid rgba(255,255,255,.22) !important;
+    }
+    [data-testid="stFileUploaderDropzone"] button * {
+        color:#fff !important;
+    }
+    .stButton > button, .stDownloadButton > button,
+    div[data-testid="stButton"] > button,
+    div[data-testid="stDownloadButton"] > button {
         width:100%; min-height:48px; border:0; border-radius:13px;
-        color:white; background:linear-gradient(100deg,#7857ef,#4277ef);
+        color:#fff !important;
+        background:linear-gradient(100deg,#7857ef,#4277ef) !important;
         font-weight:800; box-shadow:0 12px 30px rgba(79,70,229,.22);
     }
-    .stButton > button:hover, .stDownloadButton > button:hover {
-        border:0; color:white; filter:brightness(1.08);
+    .stButton > button *,
+    .stDownloadButton > button *,
+    div[data-testid="stButton"] > button *,
+    div[data-testid="stDownloadButton"] > button * {
+        color:#fff !important;
     }
-    .stButton > button:disabled { opacity:.4; }
+    .stButton > button:hover, .stDownloadButton > button:hover {
+        border:0; color:#fff !important; filter:brightness(1.08);
+    }
+    .stButton > button:disabled,
+    div[data-testid="stButton"] > button:disabled {
+        color:rgba(255,255,255,.68) !important;
+        background:linear-gradient(100deg,#4f3e94,#31538f) !important;
+        opacity:.72 !important;
+    }
+    .stButton > button:disabled *,
+    div[data-testid="stButton"] > button:disabled * {
+        color:rgba(255,255,255,.68) !important;
+    }
     .result-title { margin:72px 0 22px; }
     .done-label { color:#69e59a; font-size:12px; font-weight:800; }
     .card {
