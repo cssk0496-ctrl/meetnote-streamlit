@@ -1,8 +1,19 @@
 import json
+import csv
+import html
+from io import BytesIO, StringIO
 from datetime import datetime
 
 import streamlit as st
+import streamlit.components.v1 as components
 from openai import OpenAI
+from docx import Document
+from docx.shared import Pt
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+from reportlab.lib.styles import ParagraphStyle
 
 
 st.set_page_config(
@@ -24,6 +35,8 @@ st.markdown(
     }
     [data-testid="stHeader"] { background: transparent; }
     [data-testid="stSidebar"] { background: #0c1220; }
+    [data-testid="stAlert"] { color: #dbe7ff; }
+    [data-testid="stAlert"] p { color: #dbe7ff !important; }
     .block-container { max-width: 1160px; padding-top: 1.6rem; padding-bottom: 5rem; }
     .brand {
         display: flex; align-items: center; gap: 11px; padding: 4px 0 22px;
@@ -199,6 +212,156 @@ def make_minutes_text(result: dict, transcript: str, filename: str) -> str:
     return "\n".join(lines)
 
 
+def make_word_file(result: dict, transcript: str, filename: str) -> bytes:
+    document = Document()
+    normal = document.styles["Normal"]
+    normal.font.name = "Malgun Gothic"
+    normal.font.size = Pt(10)
+
+    document.add_heading(result["title"], level=0)
+    document.add_paragraph(f"원본 파일: {filename}")
+    document.add_paragraph(f"작성일: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+    document.add_heading("핵심 요약", level=1)
+    document.add_paragraph(result["summary"])
+
+    document.add_heading("결정사항", level=1)
+    if result["decisions"]:
+        for item in result["decisions"]:
+            document.add_paragraph(item, style="List Number")
+    else:
+        document.add_paragraph("확정된 결정사항 없음")
+
+    document.add_heading("담당 업무", level=1)
+    table = document.add_table(rows=1, cols=3)
+    table.style = "Table Grid"
+    for cell, title in zip(table.rows[0].cells, ["담당 업무", "담당자", "기한"]):
+        cell.text = title
+    for item in result["actions"]:
+        cells = table.add_row().cells
+        cells[0].text = item["task"]
+        cells[1].text = item["owner"]
+        cells[2].text = item["due"]
+
+    document.add_heading("주요 키워드", level=1)
+    document.add_paragraph(", ".join(result["keywords"]))
+    document.add_heading("전체 녹취", level=1)
+    document.add_paragraph(transcript)
+
+    output = BytesIO()
+    document.save(output)
+    return output.getvalue()
+
+
+def make_pdf_file(result: dict, transcript: str, filename: str) -> bytes:
+    output = BytesIO()
+    pdfmetrics.registerFont(UnicodeCIDFont("HYSMyeongJo-Medium"))
+    document = SimpleDocTemplate(
+        output,
+        pagesize=A4,
+        rightMargin=42,
+        leftMargin=42,
+        topMargin=45,
+        bottomMargin=45,
+        title=result["title"],
+    )
+    title_style = ParagraphStyle(
+        "KoreanTitle",
+        fontName="HYSMyeongJo-Medium",
+        fontSize=19,
+        leading=27,
+        spaceAfter=16,
+    )
+    heading_style = ParagraphStyle(
+        "KoreanHeading",
+        fontName="HYSMyeongJo-Medium",
+        fontSize=13,
+        leading=19,
+        spaceBefore=14,
+        spaceAfter=7,
+    )
+    body_style = ParagraphStyle(
+        "KoreanBody",
+        fontName="HYSMyeongJo-Medium",
+        fontSize=9.5,
+        leading=16,
+        spaceAfter=5,
+    )
+
+    def safe(value: str) -> str:
+        return html.escape(str(value)).replace("\n", "<br/>")
+
+    story = [
+        Paragraph(safe(result["title"]), title_style),
+        Paragraph(f"원본 파일: {safe(filename)}", body_style),
+        Paragraph(f"작성일: {datetime.now().strftime('%Y-%m-%d %H:%M')}", body_style),
+        Spacer(1, 8),
+        Paragraph("핵심 요약", heading_style),
+        Paragraph(safe(result["summary"]), body_style),
+        Paragraph("결정사항", heading_style),
+    ]
+    decisions = result["decisions"] or ["확정된 결정사항 없음"]
+    story.extend(
+        Paragraph(f"{index}. {safe(item)}", body_style)
+        for index, item in enumerate(decisions, 1)
+    )
+    story.append(Paragraph("담당 업무", heading_style))
+    actions = result["actions"] or [{"task": "등록된 담당 업무 없음", "owner": "-", "due": "-"}]
+    story.extend(
+        Paragraph(
+            f"• {safe(item['task'])} / 담당: {safe(item['owner'])} / 기한: {safe(item['due'])}",
+            body_style,
+        )
+        for item in actions
+    )
+    story.extend(
+        [
+            Paragraph("주요 키워드", heading_style),
+            Paragraph(safe(", ".join(result["keywords"])), body_style),
+            Paragraph("전체 녹취", heading_style),
+            Paragraph(safe(transcript), body_style),
+        ]
+    )
+    document.build(story)
+    return output.getvalue()
+
+
+def make_actions_csv(result: dict) -> bytes:
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["담당 업무", "담당자", "기한"])
+    for item in result["actions"]:
+        writer.writerow([item["task"], item["owner"], item["due"]])
+    return output.getvalue().encode("utf-8-sig")
+
+
+def show_copy_button(minutes: str) -> None:
+    payload = json.dumps(minutes)
+    components.html(
+        f"""
+        <button id="copyMinutes" style="
+          width:100%;height:46px;border:1px solid rgba(139,92,246,.45);
+          border-radius:12px;color:#fff;background:linear-gradient(100deg,#7857ef,#4277ef);
+          font:700 14px sans-serif;cursor:pointer;">
+          📋 전체 회의록 복사하기
+        </button>
+        <script>
+          const button = document.getElementById("copyMinutes");
+          button.addEventListener("click", async () => {{
+            try {{
+              await navigator.clipboard.writeText({payload});
+              button.textContent = "✓ 복사 완료";
+              setTimeout(() => button.textContent = "📋 전체 회의록 복사하기", 1800);
+            }} catch (error) {{
+              button.textContent = "복사 권한을 확인해 주세요";
+            }}
+          }});
+        </script>
+        """,
+        height=52,
+    )
+
+
 st.markdown(
     '<div class="brand"><span class="brand-mark">✦</span>MeetNote</div>',
     unsafe_allow_html=True,
@@ -269,6 +432,9 @@ if "meeting_result" in st.session_state:
     transcript = st.session_state["meeting_transcript"]
     filename = st.session_state["meeting_filename"]
     minutes = make_minutes_text(result, transcript, filename)
+    word_file = make_word_file(result, transcript, filename)
+    pdf_file = make_pdf_file(result, transcript, filename)
+    actions_csv = make_actions_csv(result)
 
     st.markdown(
         f"""
@@ -280,15 +446,41 @@ if "meeting_result" in st.session_state:
         unsafe_allow_html=True,
     )
 
-    download_col, blank_col = st.columns([1, 3])
-    with download_col:
+    st.markdown("##### 회의록 내보내기")
+    word_col, pdf_col, text_col, csv_col = st.columns(4)
+    with word_col:
         st.download_button(
-            "⬇ 회의록 다운로드",
-            data=minutes,
-            file_name=f"{result['title']}_회의록.md",
-            mime="text/markdown",
+            "📝 Word 회의록",
+            data=word_file,
+            file_name=f"{result['title']}_회의록.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             use_container_width=True,
         )
+    with pdf_col:
+        st.download_button(
+            "📄 PDF 회의록",
+            data=pdf_file,
+            file_name=f"{result['title']}_회의록.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+    with text_col:
+        st.download_button(
+            "📃 텍스트 파일",
+            data=minutes.encode("utf-8-sig"),
+            file_name=f"{result['title']}_회의록.txt",
+            mime="text/plain",
+            use_container_width=True,
+        )
+    with csv_col:
+        st.download_button(
+            "📊 담당 업무 CSV",
+            data=actions_csv,
+            file_name=f"{result['title']}_담당업무.csv",
+            mime="text/csv",
+            use_container_width=True,
+        )
+    show_copy_button(minutes)
 
     summary_tab, transcript_tab = st.tabs(["✦ AI 요약", "☰ 전체 녹취"])
     with summary_tab:
