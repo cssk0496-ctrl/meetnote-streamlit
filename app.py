@@ -458,7 +458,6 @@ with left:
     )
 
 with right:
-    st.markdown('<div class="upload-shell">', unsafe_allow_html=True)
     st.markdown("#### 🎙️ 회의 파일 업로드")
     language = st.selectbox(
         "회의 언어",
@@ -495,7 +494,6 @@ with right:
         help="음성 파일이나 API 사용 없이 결과 화면과 다운로드 기능을 확인합니다.",
     )
     st.caption("🔒 업로드한 파일은 앱에 영구 저장하지 않습니다.")
-    st.markdown("</div>", unsafe_allow_html=True)
 
 if sample:
     st.session_state["meeting_result"] = SAMPLE_RESULT
